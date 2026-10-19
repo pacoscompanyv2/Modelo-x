@@ -1,0 +1,48 @@
+name: Modelops housing deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  repository_dispatch:
+    types: [ml_ci_cd]
+
+jobs:
+  ml_ci_cd:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: pip install
+      run: pip install -r requirements.txt
+
+    - name: download dataset
+      run: wget -O data/kc_house_data.csv ${{ github.event.client_payload.dataseturl }}
+
+    - name: cat dataset
+      run: cat data/kc_house_data.csv
+
+    - name: train model
+      run: python model/train.py
+
+    - name: docker build
+      run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }} .
+
+    - name: docker login
+      env:
+        DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: |
+        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+
+    - name: docker push
+      run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }}
