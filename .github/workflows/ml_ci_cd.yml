@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: ['3.8']
     steps:
     - uses: actions/checkout@v3
 
@@ -22,27 +22,34 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: pip install
+    - name: Install dependencies
       run: pip install -r requirements.txt
 
+    - name: Ensure data directory exists
+      run: mkdir -p data
+
     - name: download dataset
+      if: github.event_name == 'repository_dispatch'
       run: wget -O data/kc_house_data.csv ${{ github.event.client_payload.dataseturl }}
 
     - name: cat dataset
+      if: github.event_name == 'repository_dispatch'
       run: cat data/kc_house_data.csv
 
     - name: train model
       run: python model/train.py
 
     - name: docker build
+      if: github.event_name == 'repository_dispatch'
       run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }} .
 
     - name: docker login
+      if: github.event_name == 'repository_dispatch'
       env:
         DOCKER_USER: ${{ secrets.DOCKER_USER }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      run: |
-        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+      run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
 
     - name: docker push
+      if: github.event_name == 'repository_dispatch'
       run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }}
