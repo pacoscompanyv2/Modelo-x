@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   repository_dispatch:
-    types: [ml_ci_cd]
+    types: [ml_ci_cd, trigger-retrain]
 
 jobs:
   ml_ci_cd:
@@ -29,11 +29,11 @@ jobs:
       run: mkdir -p data
 
     - name: download dataset
-      if: github.event_name == 'repository_dispatch'
+      if: github.event_name == 'repository_dispatch' && github.event.client_payload.dataseturl != ''
       run: wget -O data/kc_house_data.csv ${{ github.event.client_payload.dataseturl }}
 
     - name: cat dataset
-      if: github.event_name == 'repository_dispatch'
+      if: github.event_name == 'repository_dispatch' && github.event.client_payload.dataseturl != ''
       run: cat data/kc_house_data.csv
 
     - name: train model
@@ -41,7 +41,7 @@ jobs:
 
     - name: docker build
       if: github.event_name == 'repository_dispatch'
-      run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }} .
+      run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha || github.sha }} .
 
     - name: docker login
       if: github.event_name == 'repository_dispatch'
@@ -52,4 +52,4 @@ jobs:
 
     - name: docker push
       if: github.event_name == 'repository_dispatch'
-      run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha }}
+      run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha || github.sha }}
